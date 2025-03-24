@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404,redirect
+"""from django.shortcuts import render, get_object_or_404,redirect
 from .models import Listing, ListingImage
 from .forms import ListingForm
 
@@ -28,7 +28,21 @@ def edit_listing(request, listing_id):
             return redirect('listing_detail', listing_id=listing.id)
     else:
         form = ListingForm(instance=listing)
-    return render(request, 'edit_listing.html', {'form': form, 'listing': listing})
+    return render(request, 'edit_listing.html', {'form': form, 'listing': listing})"""
+
+from rest_framework import generics
+from .models import Listing
+from .serializers import ListingSerializer
+
+class ListingListCreate(generics.ListCreateAPIView):
+    """ API to List all Listings and Create a new Listing """
+    queryset = Listing.objects.all()
+    serializer_class = ListingSerializer
+
+class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
+    """ API to Retrieve, Update, or Delete a Listing """
+    queryset = Listing.objects.all()
+    serializer_class = ListingSerializer
 
 
 
