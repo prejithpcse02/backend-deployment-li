@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.conf import settings
-from .models import Listing, ListingImage
+from .models import Listing, ListingImage, Like
 
 class ListingImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
@@ -22,4 +22,10 @@ class ListingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Listing
-        fields = ['id', 'title', 'description', 'price', 'location', 'status', 'created_at', 'seller_name', 'images']
+        fields = ['product_id', 'title', 'slug', 'description', 'price','condition', 'location', 'status', 'created_at', 'seller_name', 'images']
+
+
+class LikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Like
+        fields = ['id', 'user', 'listing', 'created_at']
