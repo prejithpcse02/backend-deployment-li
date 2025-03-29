@@ -39,7 +39,8 @@ class Listing(models.Model):
     @property
     def like_count(self):
         return self.likes.count()
-
+    
+    #To be checked
     def is_liked_by(self, user):
         if user.is_authenticated:
             return self.likes.filter(user=user).exists()
@@ -69,3 +70,16 @@ class Like(models.Model):
 
     class Meta:
         unique_together = ['user', 'listing']  # Prevent duplicate likes
+    
+    # Added extra
+    def __str__(self):
+        return f"{self.user.nickname} liked {self.listing.title}"
+    
+class Search(models.Model):
+    user = models.ForeignKey(User,on_delete=models.CASCADE,null=True,blank=True)
+    query = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    session_key = models.CharField(max_length=40,null=True,blank=True)
+
+    def __str__(self):
+        return f"{self.query} - {self.user.nickname}"

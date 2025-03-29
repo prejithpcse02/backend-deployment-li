@@ -6,7 +6,7 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for user details"""
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'nickname', 'profile_picture', 'is_verified', 'created_at']
+        fields = ['id', 'email', 'username', 'nickname', 'avatar', 'is_verified', 'created_at']
         read_only_fields = ['id', 'is_verified', 'created_at']
 
 
@@ -17,7 +17,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email', 'username', 'nickname', 'password', 'password_confirm', 'profile_picture']
+        fields = ['email', 'username', 'nickname', 'password', 'password_confirm', 'avatar']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
@@ -31,14 +31,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
         # Create the user
         user = User.objects.create_user(
             email=validated_data['email'],
-            username=validated_data['username'],
+            username=validated_data['email'],
             nickname=validated_data['nickname'],
             password=validated_data['password']
         )
         
         # Add profile picture if it exists
-        if 'profile_picture' in validated_data:
-            user.profile_picture = validated_data['profile_picture']
+        if 'avatar' in validated_data:
+            user.avatar = validated_data['avatar']
             user.save()
             
         return user 
