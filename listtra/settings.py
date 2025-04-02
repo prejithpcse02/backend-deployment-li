@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'users',
     'listings',
     'offers',
+    'reviews',
 
     # Third-party apps
     'rest_framework',

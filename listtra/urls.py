@@ -8,6 +8,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/listings/', include('listings.urls')),  # Keep Listings API
     path('api/', include('users.urls')),  # Keep Users API
+    path('api/reviews/', include('reviews.urls')),
+    path('api/offers/', include('offers.urls')),
     
     # JWT Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

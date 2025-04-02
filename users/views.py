@@ -25,14 +25,14 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user"""
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from .models import User
 from .serializers import UserSerializer, UserCreateSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -63,4 +63,30 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class UserProfileByNicknameView(generics.RetrieveAPIView):
+    """
+    API endpoint for retrieving a user's profile by their nickname
+    """
+    serializer_class = UserSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]  # Allow anyone to view profiles
+
+    def get_object(self):
+        nickname = self.kwargs.get('nickname')
+        user = get_object_or_404(User, nickname=nickname)
+        return user
+
+
+class UserByNicknameView(generics.RetrieveAPIView):
+    """
+    API endpoint for retrieving a user by nickname
+    """
+    serializer_class = UserSerializer
+    permission_classes = [AllowAny]
+    
+    def get_object(self):
+        nickname = self.kwargs.get('nickname')
+        return get_object_or_404(User, nickname=nickname)
 

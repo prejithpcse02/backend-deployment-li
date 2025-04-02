@@ -18,6 +18,7 @@ class ListingImageSerializer(serializers.ModelSerializer):
 
 class ListingSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source='seller.nickname', read_only=True)  # ✅ Include seller name
+    seller_id = serializers.IntegerField(source='seller.id', read_only=True)  # Add seller ID
     images = ListingImageSerializer(many=True, read_only=True)  # ✅ Return images as a list of URLs
     is_liked = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
@@ -25,7 +26,7 @@ class ListingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Listing
         fields = ['product_id', 'title', 'slug', 'description', 'price', 'condition', 
-                 'location', 'status', 'created_at', 'seller_name', 'images',
+                 'location', 'status', 'created_at', 'seller_name', 'seller_id', 'images',
                  'is_liked', 'likes_count']
 
     def get_is_liked(self, obj):

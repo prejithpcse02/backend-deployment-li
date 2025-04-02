@@ -9,4 +9,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('register/', views.UserRegistrationView.as_view(), name='register'),
     path('profile/', views.UserProfileView.as_view(), name='profile'),
+    path('profiles/<str:nickname>/', views.UserByNicknameView.as_view(), name='user-by-nickname'),
 ]

@@ -13,8 +13,15 @@ class ListingListCreate(generics.ListCreateAPIView):
     """ API to List all Listings and Create a new Listing """
     queryset = Listing.objects.all().order_by('-created_at')
     serializer_class = ListingSerializer
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    #authentication_classes = [JWTAuthentication]
+    #permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        queryset = Listing.objects.all().order_by('-created_at')
+        seller_id = self.request.query_params.get('seller', None)
+        if seller_id:
+            queryset = queryset.filter(seller_id=seller_id)
+        return queryset
 
 class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
     """ API to Retrieve, Update, or Delete a Listing """
