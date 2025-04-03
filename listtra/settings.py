@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import dj_database_url
+from decouple import config
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,17 +29,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 #ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
-ALLOWED_HOSTS = [
-    '127.0.0.1',  # Local development
-    'localhost',   # Also allows localhost
-    '192.168.31.134',  # ✅ Add your mobile device's IP address
-]
+ALLOWED_HOSTS = config("ALLOWED_HOSTS").split(",")
 
 # Application definition
 
@@ -136,7 +133,7 @@ DATABASES = {
     }
 }
 
-DATABASES["default"] = dj_database_url.parse(os.getenv('DATABASE_URL'))
+DATABASES["default"] = dj_database_url.parse(config("DATABASE_URL"))
 
 #postgresql://li_postgres_django_user:21OBdv7AlVx6KkcXQc5Sn0eroWodL1mj@dpg-cvn2hp24d50c73fsf2s0-a.oregon-postgres.render.com/li_postgres_django
 
