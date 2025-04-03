@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import dj_database_url
 
 # Load environment variables from .env file
 load_dotenv()
@@ -134,6 +135,10 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+DATABASES["default"] = dj_database_url.parse("postgresql://li_postgres_django_user:21OBdv7AlVx6KkcXQc5Sn0eroWodL1mj@dpg-cvn2hp24d50c73fsf2s0-a.oregon-postgres.render.com/li_postgres_django")
+
+#postgresql://li_postgres_django_user:21OBdv7AlVx6KkcXQc5Sn0eroWodL1mj@dpg-cvn2hp24d50c73fsf2s0-a.oregon-postgres.render.com/li_postgres_django
 
 
 # Password validation
