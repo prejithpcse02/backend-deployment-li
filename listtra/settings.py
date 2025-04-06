@@ -74,6 +74,15 @@ MIDDLEWARE = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Add these settings for production media handling
+if not DEBUG:
+    # Use your deployed domain here
+    MEDIA_HOST = config('MEDIA_HOST', default='https://your-deployed-domain.com')
+    MEDIA_URL = f'{MEDIA_HOST}/media/'
+    
+    # Allow unauthenticated access to media files
+    MEDIA_SERVE_AUTHENTICATED = False
+
 CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True

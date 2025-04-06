@@ -14,7 +14,10 @@ class ListingImageSerializer(serializers.ModelSerializer):
         """ ✅ Ensure full image URL is returned """
         request = self.context.get('request')
         if obj.image:
-            return request.build_absolute_uri(obj.image.url)
+            if settings.DEBUG:
+                return request.build_absolute_uri(obj.image.url)
+            else:
+                return f"{settings.MEDIA_HOST}{obj.image.url}"
         return None
         
     def get_is_primary(self, obj):
