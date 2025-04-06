@@ -4,10 +4,12 @@ from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Listing, Like, Search
-from .serializers import ListingSerializer, LikeSerializer, SearchSerializer
+from .models import Listing, Like, Search, ListingImage
+from .serializers import ListingSerializer, LikeSerializer, SearchSerializer,ListingCreateSerializer, ListingDetailSerializer
 from rest_framework.exceptions import NotFound
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import MultiPartParser, FormParser
 
 class ListingListCreate(generics.ListCreateAPIView):
     """ API to List all Listings and Create a new Listing """
@@ -22,9 +24,16 @@ class ListingListCreate(generics.ListCreateAPIView):
         if seller_id:
             queryset = queryset.filter(seller_id=seller_id)
         return queryset
+    
+class ListingCreate(generics.CreateAPIView):
+    serializer_class = ListingCreateSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
-    """ API to Retrieve, Update, or Delete a Listing """
+    def perform_create(self, serializer):
+        serializer.save(seller=self.request.user)
+
+"""class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Listing.objects.all().order_by('-created_at')
     serializer_class = ListingSerializer
     #authentication_classes = [JWTAuthentication]
@@ -39,7 +48,293 @@ class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
         try:
             return Listing.objects.get(slug=slug, product_id=product_id)
         except Listing.DoesNotExist:
-            raise NotFound("Listing not found")
+            raise NotFound("Listing not found")"""
+
+class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
+    """API endpoint for retrieving, updating, or deleting a listing"""
+    queryset = Listing.objects.all()
+    serializer_class = ListingDetailSerializer
+    authentication_classes = [JWTAuthentication]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    lookup_field = 'product_id'
+    lookup_url_kwarg = 'product_id'
+
+    def get_object(self):
+        slug = self.kwargs.get('slug')
+        product_id = self.kwargs.get('product_id')
+        
+        try:
+            if slug:
+                # If slug is provided, use both slug and product_id
+                try:
+                    return Listing.objects.get(slug=slug, product_id=product_id)
+                except Listing.DoesNotExist:
+                    # Check if the product_id exists but with a different slug
+                    try:
+                        listing = Listing.objects.get(product_id=product_id)
+                        print(f"Warning: Found listing with product_id {product_id} but slug is '{listing.slug}' not '{slug}'")
+                        return listing
+                    except Listing.DoesNotExist:
+                        raise NotFound(f"Listing not found with slug '{slug}' and product_id '{product_id}'")
+            else:
+                # If only product_id is provided, use just that
+                return Listing.objects.get(product_id=product_id)
+        except Listing.DoesNotExist:
+            raise NotFound(f"Listing not found with product_id '{product_id}'")
+        except Exception as e:
+            print(f"Error retrieving listing: {str(e)}")
+            raise
+    
+    def update(self, request, *args, **kwargs):
+        # Get the listing object
+        listing = self.get_object()
+        
+        # Check if user is the owner of the listing
+        if request.user.id != listing.seller.id:
+            # Check if seller_id was provided in the request data
+            if 'seller_id' in request.data:
+                seller_id = request.data['seller_id']
+                try:
+                    seller_id_int = int(seller_id)
+                    if request.user.id != seller_id_int:
+                        raise PermissionDenied("You don't have permission to edit this listing")
+                except (ValueError, TypeError):
+                    raise PermissionDenied("Invalid seller_id format")
+            else:
+                raise PermissionDenied("You don't have permission to edit this listing")
+        
+        # Log the request data
+        print("Update request data:", request.data)
+        
+        # Handle price field specially to avoid floating point issues
+        data = request.data.copy()
+        if 'price' in data:
+            price_str = data['price']
+            print(f"Processing price from request: {price_str}, type: {type(price_str)}")
+            
+            # If it's a string (which it should be from FormData), try to parse it correctly
+            if isinstance(price_str, str):
+                try:
+                    # Convert to Decimal directly to avoid floating-point issues
+                    from decimal import Decimal
+                    price_value = Decimal(price_str)
+                    print(f"Parsed price value: {price_value}")
+                    data['price'] = price_value
+                except Exception as e:
+                    print(f"Error parsing price: {e}")
+        
+        # Update basic fields with serializer
+        serializer = self.get_serializer(listing, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        # Handle image deletions
+        if 'images_to_delete' in request.data:
+            # Handle JSON array format
+            try:
+                import json
+                images_to_delete = json.loads(request.data['images_to_delete'])
+                for image_id in images_to_delete:
+                    try:
+                        image = ListingImage.objects.get(id=image_id, listing=listing)
+                        image.delete()
+                        print(f"Deleted image: {image_id}")
+                    except ListingImage.DoesNotExist:
+                        print(f"Image not found: {image_id}")
+            except json.JSONDecodeError:
+                # Handle individual fields
+                images_to_delete = request.data.getlist('images_to_delete')
+                for image_id in images_to_delete:
+                    try:
+                        image = ListingImage.objects.get(id=image_id, listing=listing)
+                        image.delete()
+                        print(f"Deleted image: {image_id}")
+                    except ListingImage.DoesNotExist:
+                        print(f"Image not found: {image_id}")
+        
+        # Check for alternate format for image deletion
+        if 'images_to_delete_list[]' in request.data:
+            images_to_delete = request.data.getlist('images_to_delete_list[]')
+            for image_id in images_to_delete:
+                try:
+                    image = ListingImage.objects.get(id=image_id, listing=listing)
+                    image.delete()
+                    print(f"Deleted image (alt format): {image_id}")
+                except ListingImage.DoesNotExist:
+                    print(f"Image not found (alt format): {image_id}")
+        
+        # Handle setting main image for existing images
+        if 'main_image_id' in request.data and request.data['main_image_id']:
+            main_image_id = request.data['main_image_id']
+            try:
+                # Check if is_primary field exists in the model
+                has_is_primary_field = hasattr(ListingImage, 'is_primary')
+                
+                if has_is_primary_field:
+                    # Set all images to not primary first
+                    ListingImage.objects.filter(listing=listing).update(is_primary=False)
+                    
+                    # Set the selected one to primary
+                    main_image = ListingImage.objects.get(id=main_image_id, listing=listing)
+                    main_image.is_primary = True
+                    main_image.save()
+                    print(f"Set main image: {main_image_id}")
+                    
+                    # Double-check that it was set correctly
+                    reloaded_image = ListingImage.objects.get(id=main_image_id)
+                    print(f"Image {main_image_id} is_primary status after save: {reloaded_image.is_primary}")
+                    
+                    # Verify no other images are primary
+                    other_primary = ListingImage.objects.filter(listing=listing, is_primary=True).exclude(id=main_image_id).count()
+                    if other_primary > 0:
+                        print(f"WARNING: Found {other_primary} other primary images - fixing...")
+                        ListingImage.objects.filter(listing=listing, is_primary=True).exclude(id=main_image_id).update(is_primary=False)
+                else:
+                    # If is_primary field doesn't exist, just log that we can't set primary image
+                    print(f"Warning: is_primary field not available in ListingImage model, skipping primary image setting")
+            except ListingImage.DoesNotExist:
+                print(f"Main image not found: {main_image_id}")
+                # If the specified image doesn't exist, use the first available image
+                first_image = ListingImage.objects.filter(listing=listing).first()
+                if first_image and has_is_primary_field:
+                    first_image.is_primary = True
+                    first_image.save()
+                    print(f"Set first available image as main instead: {first_image.id}")
+            except Exception as e:
+                print(f"Error setting main image: {e}")
+        
+        # Handle new images
+        new_images = []
+        
+        # Try different ways the images might be sent
+        new_image_fields = [k for k in request.data.keys() if k.startswith('new_image_')]
+        if new_image_fields:
+            # Handle indexed image fields
+            for field in new_image_fields:
+                if request.FILES.get(field):
+                    # Check if is_primary field exists in the model
+                    has_is_primary_field = hasattr(ListingImage, 'is_primary')
+                    
+                    # Create the image with or without is_primary field
+                    if has_is_primary_field:
+                        new_image = ListingImage.objects.create(
+                            listing=listing,
+                            image=request.FILES[field],
+                            is_primary=False  # Not primary by default
+                        )
+                    else:
+                        new_image = ListingImage.objects.create(
+                            listing=listing,
+                            image=request.FILES[field]
+                        )
+                    new_images.append(new_image)
+                    print(f"Added new image from {field}: {new_image.id}")
+        elif request.FILES.getlist('new_images'):
+            # Handle multiple image uploads with the same field name
+            for image_file in request.FILES.getlist('new_images'):
+                # Check if is_primary field exists in the model
+                has_is_primary_field = hasattr(ListingImage, 'is_primary')
+                
+                # Create the image with or without is_primary field
+                if has_is_primary_field:
+                    new_image = ListingImage.objects.create(
+                        listing=listing,
+                        image=image_file,
+                        is_primary=False
+                    )
+                else:
+                    new_image = ListingImage.objects.create(
+                        listing=listing,
+                        image=image_file
+                    )
+                new_images.append(new_image)
+                print(f"Added new image from new_images list: {new_image.id}")
+        
+        # Handle setting main image from new images
+        if 'set_main_image_from_new' in request.data and new_images:
+            print("Setting a new image as main (primary)")
+            # Check if is_primary field exists in the model
+            has_is_primary_field = hasattr(ListingImage, 'is_primary')
+            
+            if has_is_primary_field:
+                # Set all existing images to not primary
+                ListingImage.objects.filter(listing=listing).update(is_primary=False)
+                # Set the first new image to primary
+                new_images[0].is_primary = True
+                new_images[0].save()
+                print(f"Set first new image as main: {new_images[0].id}")
+                
+                # Double-check that it was set correctly
+                reloaded_image = ListingImage.objects.get(id=new_images[0].id)
+                print(f"New image {new_images[0].id} is_primary status after save: {reloaded_image.is_primary}")
+            else:
+                print("Warning: is_primary field not available in ListingImage model, skipping primary image setting")
+        
+        # If no image is set as primary, set the first image as primary
+        has_is_primary_field = hasattr(ListingImage, 'is_primary')
+        if has_is_primary_field and not ListingImage.objects.filter(listing=listing, is_primary=True).exists() and ListingImage.objects.filter(listing=listing).exists():
+            first_image = ListingImage.objects.filter(listing=listing).first()
+            first_image.is_primary = True
+            first_image.save()
+            print(f"Set first existing image as main by default: {first_image.id}")
+            
+            # Double-check that it was set correctly
+            reloaded_image = ListingImage.objects.get(id=first_image.id)
+            print(f"Default image {first_image.id} is_primary status after save: {reloaded_image.is_primary}")
+        
+        # Final check - get all images and their primary status
+        all_images = ListingImage.objects.filter(listing=listing)
+        print(f"Final image count: {all_images.count()}")
+        
+        # Check if is_primary field exists in the model
+        has_is_primary_field = hasattr(ListingImage, 'is_primary')
+        
+        if has_is_primary_field:
+            for img in all_images:
+                print(f"Image {img.id}: is_primary={img.is_primary}")
+            
+            # Ensure at least one image is primary
+            primary_count = ListingImage.objects.filter(listing=listing, is_primary=True).count()
+            if primary_count == 0 and all_images.count() > 0:
+                print("FIXING: No primary images found after all operations!")
+                first_image = all_images.first()
+                first_image.is_primary = True
+                first_image.save()
+                print(f"Set image {first_image.id} as primary as fallback")
+            elif primary_count > 1:
+                print(f"FIXING: Multiple primary images found ({primary_count})")
+                # Keep only the first one as primary
+                primary_images = ListingImage.objects.filter(listing=listing, is_primary=True)
+                first_primary = primary_images.first()
+                primary_images.exclude(id=first_primary.id).update(is_primary=False)
+                print(f"Kept only {first_primary.id} as primary")
+        
+        # Return the updated listing
+        from rest_framework.response import Response
+        updated_listing = self.get_serializer(listing).data
+        return Response(updated_listing)
+            
+    def destroy(self, request, *args, **kwargs):
+        # Get the listing object
+        listing = self.get_object()
+        
+        # Check if user is the owner of the listing
+        if request.user.id != listing.seller.id:
+            raise PermissionDenied("You don't have permission to delete this listing")
+            
+        # Perform the deletion
+        listing.delete()
+        
+        # Return success response
+        from rest_framework.response import Response
+        from rest_framework import status
+        return Response({"detail": "Listing deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class ListingSearch(generics.ListAPIView):

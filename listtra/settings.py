@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'listings',
     'offers',
     'reviews',
+    'chat',
 
     # Third-party apps
     'rest_framework',

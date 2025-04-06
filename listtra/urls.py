@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/', include('users.urls')),  # Keep Users API
     path('api/reviews/', include('reviews.urls')),
     path('api/offers/', include('offers.urls')),
+    path('api/chat/', include('chat.urls')),
     
     # JWT Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
