@@ -2,6 +2,15 @@ from django.db import models
 from users.models import User
 from django.utils.text import slugify
 import uuid
+import os
+
+def listing_image_path(instance, filename):
+    # Get the file extension
+    ext = filename.split('.')[-1]
+    # Generate a unique filename using UUID
+    filename = f"{uuid.uuid4()}.{ext}"
+    # Return the complete path
+    return os.path.join('listing_images', filename)
 
 class Listing(models.Model):
     CONDITION_CHOICES = [
@@ -48,11 +57,18 @@ class Listing(models.Model):
 
 class ListingImage(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="images")
-    image = models.ImageField(upload_to='listing_images/')
+    image = models.ImageField(upload_to=listing_image_path)
+    is_primary = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Image for {self.listing.title}"
     
+    def save(self, *args, **kwargs):
+        # If this is the first image for the listing, make it primary
+        if not self.listing.images.exists() and not self.is_primary:
+            self.is_primary = True
+        super().save(*args, **kwargs)
+
 #For Search
 class RecentSearch(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recent_searches')

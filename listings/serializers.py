@@ -8,23 +8,30 @@ class ListingImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ListingImage
-        fields = ['id', 'image_url', 'is_primary']  # Include is_primary field
+        fields = ['id', 'image_url', 'is_primary']
 
     def get_image_url(self, obj):
-        """ ✅ Ensure full image URL is returned """
         request = self.context.get('request')
         if obj.image:
-            if settings.DEBUG:
-                return request.build_absolute_uri(obj.image.url)
-            else:
-                return f"{settings.MEDIA_HOST}{obj.image.url}"
-        return None
-        
+            try:
+                if settings.DEBUG:
+                    return request.build_absolute_uri(obj.image.url)
+                else:
+                    # Ensure the URL starts with http/https
+                    url = obj.image.url
+                    if not url.startswith(('http://', 'https://')):
+                        url = f"{settings.MEDIA_HOST}{url}"
+                    return url
+            except Exception as e:
+                print(f"Error generating image URL: {str(e)}")
+                # Return a default image URL if there's an error
+                return f"{settings.MEDIA_HOST}/media/default.jpg"
+        # Return a default image URL if no image is available
+        return f"{settings.MEDIA_HOST}/media/default.jpg"
+
     def get_is_primary(self, obj):
-        """Handle the case where is_primary field doesn't exist"""
         if hasattr(obj, 'is_primary'):
             return obj.is_primary
-        # If is_primary doesn't exist, consider the first image as primary
         if obj.listing.images.exists():
             return obj.listing.images.first().id == obj.id
         return False
