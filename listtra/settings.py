@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',  # JWT Authentication
     'corsheaders',  # CORS for frontend communication
+    'cloudinary',  # Cloudinary storage
+    'cloudinary_storage',  # Django Cloudinary Storage
 ]
 
 MIDDLEWARE = [
@@ -71,8 +73,22 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Cloudinary Configuration
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default='')
+}
+
+# Use Cloudinary for media files in production
+if not DEBUG:
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    # Optional: Use Cloudinary for static files too
+    # STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
 
 # Add these settings for production media handling
 """if not DEBUG:

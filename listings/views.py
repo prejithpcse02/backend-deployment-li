@@ -72,24 +72,12 @@ class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
         try:
             if slug:
                 # If slug is provided, use both slug and product_id
-                try:
-                    return Listing.objects.get(slug=slug, product_id=product_id)
-                except Listing.DoesNotExist:
-                    # Check if the product_id exists but with a different slug
-                    try:
-                        listing = Listing.objects.get(product_id=product_id)
-                        print(f"Warning: Found listing with product_id {product_id} but slug is '{listing.slug}' not '{slug}'")
-                        return listing
-                    except Listing.DoesNotExist:
-                        raise NotFound(f"Listing not found with slug '{slug}' and product_id '{product_id}'")
+                return Listing.objects.get(slug=slug, product_id=product_id)
             else:
                 # If only product_id is provided, use just that
                 return Listing.objects.get(product_id=product_id)
         except Listing.DoesNotExist:
-            raise NotFound(f"Listing not found with product_id '{product_id}'")
-        except Exception as e:
-            print(f"Error retrieving listing: {str(e)}")
-            raise
+            raise NotFound("Listing not found")
     
     def update(self, request, *args, **kwargs):
         # Get the listing object
@@ -97,17 +85,7 @@ class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
         
         # Check if user is the owner of the listing
         if request.user.id != listing.seller.id:
-            # Check if seller_id was provided in the request data
-            if 'seller_id' in request.data:
-                seller_id = request.data['seller_id']
-                try:
-                    seller_id_int = int(seller_id)
-                    if request.user.id != seller_id_int:
-                        raise PermissionDenied("You don't have permission to edit this listing")
-                except (ValueError, TypeError):
-                    raise PermissionDenied("Invalid seller_id format")
-            else:
-                raise PermissionDenied("You don't have permission to edit this listing")
+            raise PermissionDenied("You don't have permission to edit this listing")
         
         # Log the request data
         print("Update request data:", request.data)
@@ -173,36 +151,29 @@ class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
         if 'main_image_id' in request.data and request.data['main_image_id']:
             main_image_id = request.data['main_image_id']
             try:
-                # Check if is_primary field exists in the model
-                has_is_primary_field = hasattr(ListingImage, 'is_primary')
+                # Set all images to not primary first
+                ListingImage.objects.filter(listing=listing).update(is_primary=False)
                 
-                if has_is_primary_field:
-                    # Set all images to not primary first
-                    ListingImage.objects.filter(listing=listing).update(is_primary=False)
-                    
-                    # Set the selected one to primary
-                    main_image = ListingImage.objects.get(id=main_image_id, listing=listing)
-                    main_image.is_primary = True
-                    main_image.save()
-                    print(f"Set main image: {main_image_id}")
-                    
-                    # Double-check that it was set correctly
-                    reloaded_image = ListingImage.objects.get(id=main_image_id)
-                    print(f"Image {main_image_id} is_primary status after save: {reloaded_image.is_primary}")
-                    
-                    # Verify no other images are primary
-                    other_primary = ListingImage.objects.filter(listing=listing, is_primary=True).exclude(id=main_image_id).count()
-                    if other_primary > 0:
-                        print(f"WARNING: Found {other_primary} other primary images - fixing...")
-                        ListingImage.objects.filter(listing=listing, is_primary=True).exclude(id=main_image_id).update(is_primary=False)
-                else:
-                    # If is_primary field doesn't exist, just log that we can't set primary image
-                    print(f"Warning: is_primary field not available in ListingImage model, skipping primary image setting")
+                # Set the selected one to primary
+                main_image = ListingImage.objects.get(id=main_image_id, listing=listing)
+                main_image.is_primary = True
+                main_image.save()
+                print(f"Set main image: {main_image_id}")
+                
+                # Double-check that it was set correctly
+                reloaded_image = ListingImage.objects.get(id=main_image_id)
+                print(f"Image {main_image_id} is_primary status after save: {reloaded_image.is_primary}")
+                
+                # Verify no other images are primary
+                other_primary = ListingImage.objects.filter(listing=listing, is_primary=True).exclude(id=main_image_id).count()
+                if other_primary > 0:
+                    print(f"WARNING: Found {other_primary} other primary images - fixing...")
+                    ListingImage.objects.filter(listing=listing, is_primary=True).exclude(id=main_image_id).update(is_primary=False)
             except ListingImage.DoesNotExist:
                 print(f"Main image not found: {main_image_id}")
                 # If the specified image doesn't exist, use the first available image
                 first_image = ListingImage.objects.filter(listing=listing).first()
-                if first_image and has_is_primary_field:
+                if first_image:
                     first_image.is_primary = True
                     first_image.save()
                     print(f"Set first available image as main instead: {first_image.id}")
@@ -218,67 +189,40 @@ class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
             # Handle indexed image fields
             for field in new_image_fields:
                 if request.FILES.get(field):
-                    # Check if is_primary field exists in the model
-                    has_is_primary_field = hasattr(ListingImage, 'is_primary')
-                    
-                    # Create the image with or without is_primary field
-                    if has_is_primary_field:
-                        new_image = ListingImage.objects.create(
-                            listing=listing,
-                            image=request.FILES[field],
-                            is_primary=False  # Not primary by default
-                        )
-                    else:
-                        new_image = ListingImage.objects.create(
-                            listing=listing,
-                            image=request.FILES[field]
-                        )
+                    new_image = ListingImage.objects.create(
+                        listing=listing,
+                        image=request.FILES[field],
+                        is_primary=False  # Not primary by default
+                    )
                     new_images.append(new_image)
                     print(f"Added new image from {field}: {new_image.id}")
         elif request.FILES.getlist('new_images'):
             # Handle multiple image uploads with the same field name
             for image_file in request.FILES.getlist('new_images'):
-                # Check if is_primary field exists in the model
-                has_is_primary_field = hasattr(ListingImage, 'is_primary')
-                
-                # Create the image with or without is_primary field
-                if has_is_primary_field:
-                    new_image = ListingImage.objects.create(
-                        listing=listing,
-                        image=image_file,
-                        is_primary=False
-                    )
-                else:
-                    new_image = ListingImage.objects.create(
-                        listing=listing,
-                        image=image_file
-                    )
+                new_image = ListingImage.objects.create(
+                    listing=listing,
+                    image=image_file,
+                    is_primary=False
+                )
                 new_images.append(new_image)
                 print(f"Added new image from new_images list: {new_image.id}")
         
         # Handle setting main image from new images
         if 'set_main_image_from_new' in request.data and new_images:
             print("Setting a new image as main (primary)")
-            # Check if is_primary field exists in the model
-            has_is_primary_field = hasattr(ListingImage, 'is_primary')
+            # Set all existing images to not primary
+            ListingImage.objects.filter(listing=listing).update(is_primary=False)
+            # Set the first new image to primary
+            new_images[0].is_primary = True
+            new_images[0].save()
+            print(f"Set first new image as main: {new_images[0].id}")
             
-            if has_is_primary_field:
-                # Set all existing images to not primary
-                ListingImage.objects.filter(listing=listing).update(is_primary=False)
-                # Set the first new image to primary
-                new_images[0].is_primary = True
-                new_images[0].save()
-                print(f"Set first new image as main: {new_images[0].id}")
-                
-                # Double-check that it was set correctly
-                reloaded_image = ListingImage.objects.get(id=new_images[0].id)
-                print(f"New image {new_images[0].id} is_primary status after save: {reloaded_image.is_primary}")
-            else:
-                print("Warning: is_primary field not available in ListingImage model, skipping primary image setting")
+            # Double-check that it was set correctly
+            reloaded_image = ListingImage.objects.get(id=new_images[0].id)
+            print(f"New image {new_images[0].id} is_primary status after save: {reloaded_image.is_primary}")
         
         # If no image is set as primary, set the first image as primary
-        has_is_primary_field = hasattr(ListingImage, 'is_primary')
-        if has_is_primary_field and not ListingImage.objects.filter(listing=listing, is_primary=True).exists() and ListingImage.objects.filter(listing=listing).exists():
+        if not ListingImage.objects.filter(listing=listing, is_primary=True).exists() and ListingImage.objects.filter(listing=listing).exists():
             first_image = ListingImage.objects.filter(listing=listing).first()
             first_image.is_primary = True
             first_image.save()
@@ -287,33 +231,28 @@ class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
             # Double-check that it was set correctly
             reloaded_image = ListingImage.objects.get(id=first_image.id)
             print(f"Default image {first_image.id} is_primary status after save: {reloaded_image.is_primary}")
-        
+            
         # Final check - get all images and their primary status
         all_images = ListingImage.objects.filter(listing=listing)
         print(f"Final image count: {all_images.count()}")
+        for img in all_images:
+            print(f"Image {img.id}: is_primary={img.is_primary}")
         
-        # Check if is_primary field exists in the model
-        has_is_primary_field = hasattr(ListingImage, 'is_primary')
-        
-        if has_is_primary_field:
-            for img in all_images:
-                print(f"Image {img.id}: is_primary={img.is_primary}")
-            
-            # Ensure at least one image is primary
-            primary_count = ListingImage.objects.filter(listing=listing, is_primary=True).count()
-            if primary_count == 0 and all_images.count() > 0:
-                print("FIXING: No primary images found after all operations!")
-                first_image = all_images.first()
-                first_image.is_primary = True
-                first_image.save()
-                print(f"Set image {first_image.id} as primary as fallback")
-            elif primary_count > 1:
-                print(f"FIXING: Multiple primary images found ({primary_count})")
-                # Keep only the first one as primary
-                primary_images = ListingImage.objects.filter(listing=listing, is_primary=True)
-                first_primary = primary_images.first()
-                primary_images.exclude(id=first_primary.id).update(is_primary=False)
-                print(f"Kept only {first_primary.id} as primary")
+        # Ensure at least one image is primary
+        primary_count = ListingImage.objects.filter(listing=listing, is_primary=True).count()
+        if primary_count == 0 and all_images.count() > 0:
+            print("FIXING: No primary images found after all operations!")
+            first_image = all_images.first()
+            first_image.is_primary = True
+            first_image.save()
+            print(f"Set image {first_image.id} as primary as fallback")
+        elif primary_count > 1:
+            print(f"FIXING: Multiple primary images found ({primary_count})")
+            # Keep only the first one as primary
+            primary_images = ListingImage.objects.filter(listing=listing, is_primary=True)
+            first_primary = primary_images.first()
+            primary_images.exclude(id=first_primary.id).update(is_primary=False)
+            print(f"Kept only {first_primary.id} as primary")
         
         # Return the updated listing
         from rest_framework.response import Response

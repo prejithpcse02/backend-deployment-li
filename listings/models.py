@@ -3,6 +3,8 @@ from users.models import User
 from django.utils.text import slugify
 import uuid
 import os
+from django.conf import settings
+from cloudinary.models import CloudinaryField
 
 def listing_image_path(instance, filename):
     # Get the file extension
@@ -57,7 +59,7 @@ class Listing(models.Model):
 
 class ListingImage(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="images")
-    image = models.ImageField(upload_to=listing_image_path)
+    image = CloudinaryField('image', folder='listing_images')
     is_primary = models.BooleanField(default=False)
 
     def __str__(self):
@@ -68,6 +70,11 @@ class ListingImage(models.Model):
         if not self.listing.images.exists() and not self.is_primary:
             self.is_primary = True
         super().save(*args, **kwargs)
+    
+    @property
+    def get_image_url(self):
+        """Return the Cloudinary image URL"""
+        return self.image.url if self.image else None
 
 #For Search
 class RecentSearch(models.Model):
