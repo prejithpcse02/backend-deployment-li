@@ -1,6 +1,7 @@
 from django.db import models
 from users.models import User
 from listings.models import Listing
+#from offers.models import Offers
 
 class Conversation(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="conversations")
@@ -29,6 +30,8 @@ class Message(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    is_offer = models.BooleanField(default=False)
+    offer = models.ForeignKey('offers.Offer', null=True, blank=True, on_delete=models.SET_NULL, related_name='offer_messages')
 
     def __str__(self):
         return f"Message from {self.sender.username} in {self.conversation}"
