@@ -91,13 +91,17 @@ if not DEBUG:
     # STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
 
 # Add these settings for production media handling
-"""if not DEBUG:
+if not DEBUG:
     # Use your deployed domain here
-    MEDIA_HOST = config('MEDIA_HOST', default='https://backend-deployment-li.onrender.com')
-    MEDIA_URL = f'{MEDIA_HOST}/media/'"""
+    MEDIA_HOST = config('MEDIA_HOST', default='https://backend-deployment-li-2.onrender.com')
+    MEDIA_URL = f'{MEDIA_HOST}/media/'
+else:
+    # For development, use localhost
+    MEDIA_HOST = 'http://127.0.0.1:8000'
+    MEDIA_URL = '/media/'
     
-    # Allow unauthenticated access to media files
-#MEDIA_SERVE_AUTHENTICATED = False
+# Allow unauthenticated access to media files
+MEDIA_SERVE_AUTHENTICATED = False
 
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -159,7 +163,7 @@ DATABASES = {
     }
 }
 
-DATABASES["default"] = dj_database_url.parse(config("DATABASE_URL"))
+#DATABASES["default"] = dj_database_url.parse(config("DATABASE_URL"))
 
 #postgresql://li_postgres_django_user:21OBdv7AlVx6KkcXQc5Sn0eroWodL1mj@dpg-cvn2hp24d50c73fsf2s0-a.oregon-postgres.render.com/li_postgres_django
 

@@ -33,22 +33,6 @@ class ListingCreate(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
 
-"""class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Listing.objects.all().order_by('-created_at')
-    serializer_class = ListingSerializer
-    #authentication_classes = [JWTAuthentication]
-    #permission_classes = [IsAuthenticated]
-    lookup_field = 'product_id'
-    lookup_url_kwarg = 'product_id'
-
-    def get_object(self):
-        slug = self.kwargs.get('slug')
-        product_id = self.kwargs.get('product_id')
-        
-        try:
-            return Listing.objects.get(slug=slug, product_id=product_id)
-        except Listing.DoesNotExist:
-            raise NotFound("Listing not found")"""
 
 class ListingDetail(generics.RetrieveUpdateDestroyAPIView):
     """API endpoint for retrieving, updating, or deleting a listing"""

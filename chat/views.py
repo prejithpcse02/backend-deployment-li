@@ -1,29 +1,38 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework.response import Response
 from django.db.models import Q
+from django.utils import timezone
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from listings.models import Listing
+from rest_framework.exceptions import PermissionDenied, NotFound
 
 class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Conversation.objects.filter(participants=self.request.user)
+        return Conversation.objects.filter(
+            participants=self.request.user,
+            is_active=True
+        ).order_by('-updated_at')
 
     def create(self, request, *args, **kwargs):
         listing_id = request.data.get('listing')
         try:
-            listing = Listing.objects.get(id=listing_id)
+            listing = Listing.objects.get(product_id=listing_id)
         except Listing.DoesNotExist:
             return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Check if conversation already exists
         conversation = Conversation.objects.filter(
             listing=listing,
-            participants=request.user
+            participants=request.user,
+            is_active=True
         ).first()
 
         if conversation:
@@ -31,35 +40,81 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         conversation = Conversation.objects.create(listing=listing)
         conversation.participants.add(request.user, listing.seller)
-        return Response(ConversationSerializer(conversation).data)
+        return Response(ConversationSerializer(conversation).data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        conversation = self.get_object()
+        if request.user not in conversation.participants.all():
+            raise PermissionDenied("You are not a participant in this conversation")
+        
+        conversation.is_active = False
+        conversation.save()
+        return Response({"status": "conversation archived"}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
         conversation = self.get_object()
-        messages = conversation.messages.all()
+        if request.user not in conversation.participants.all():
+            raise PermissionDenied("You are not a participant in this conversation")
+            
+        messages = conversation.messages.filter(is_deleted=False).order_by('created_at')
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        conversation = self.get_object()
+        if request.user not in conversation.participants.all():
+            raise PermissionDenied("You are not a participant in this conversation")
+            
+        conversation.is_active = False
+        conversation.save()
+        return Response({"status": "conversation archived"}, status=status.HTTP_200_OK)
+
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
+    authentication_classes = [JWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return Message.objects.filter(
-            Q(conversation__participants=self.request.user)
-        )
+            Q(conversation__participants=self.request.user) &
+            Q(is_deleted=False)
+        ).order_by('created_at')
 
     def perform_create(self, serializer):
         conversation = serializer.validated_data['conversation']
         if self.request.user not in conversation.participants.all():
-            raise permissions.PermissionDenied("You are not a participant in this conversation")
+            raise PermissionDenied("You are not a participant in this conversation")
         serializer.save(sender=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        message = self.get_object()
+        if message.sender != request.user:
+            raise PermissionDenied("You can only delete your own messages")
+            
+        message.is_deleted = True
+        message.deleted_at = timezone.now()
+        message.save()
+        return Response({"status": "message deleted"}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
         message = self.get_object()
-        if message.conversation.participants.filter(id=request.user.id).exists():
-            message.is_read = True
-            message.save()
-            return Response({"status": "message marked as read"})
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN) 
+        if request.user not in message.conversation.participants.all():
+            raise PermissionDenied("You are not a participant in this conversation")
+            
+        message.is_read = True
+        message.save()
+        return Response({"status": "message marked as read"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def delete(self, request, pk=None):
+        message = self.get_object()
+        if message.sender != request.user:
+            raise PermissionDenied("You can only delete your own messages")
+            
+        message.is_deleted = True
+        message.deleted_at = timezone.now()
+        message.save()
+        return Response({"status": "message deleted"}, status=status.HTTP_200_OK) 

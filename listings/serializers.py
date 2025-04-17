@@ -15,7 +15,7 @@ class ListingImageSerializer(serializers.ModelSerializer):
         if obj.image:
             try:
                 if settings.DEBUG:
-                    return request.build_absolute_uri(obj.image.url)
+                    return request.build_absolute_uri(obj.image.url) if request else obj.image.url
                 else:
                     # Ensure the URL starts with http/https
                     url = obj.image.url
