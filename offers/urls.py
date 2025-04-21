@@ -7,4 +7,6 @@ router.register(r'', OfferViewSet, basename='offer')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('<int:pk>/accept/', OfferViewSet.as_view({'post': 'accept'}), name='offer-accept'),
+    path('<int:pk>/reject/', OfferViewSet.as_view({'post': 'reject'}), name='offer-reject'),
 ]

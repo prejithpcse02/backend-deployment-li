@@ -7,7 +7,8 @@ from .views import (
     LikeListing,
     UserLikes,
     ListingLikeCount,
-    ListingCreate
+    ListingCreate,
+    UpdateListingStatus
 )
 
 urlpatterns = [
@@ -18,6 +19,7 @@ urlpatterns = [
     path('<slug:slug>/<uuid:product_id>/like/', LikeListing.as_view(), name='like-listing'),
     path('liked/', UserLikes.as_view(), name='user-likes'),
     path('<slug:slug>/<uuid:product_id>/like-count/', ListingLikeCount.as_view(), name='listing-like-count'),
+    path('<slug:slug>/<uuid:product_id>/status/', UpdateListingStatus.as_view(), name='update-listing-status'),
     path('<slug:slug>/<uuid:product_id>/', ListingDetail.as_view(), name='listing-detail'),
     path('<uuid:product_id>/', ListingDetail.as_view(), name='listing-detail-by-id'),
     path('<uuid:product_id>/edit/', ListingDetail.as_view(), name='listing-edit'),

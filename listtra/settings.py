@@ -163,7 +163,7 @@ DATABASES = {
     }
 }
 
-#DATABASES["default"] = dj_database_url.parse(config("DATABASE_URL"))
+DATABASES["default"] = dj_database_url.parse(config("DATABASE_URL"))
 
 #postgresql://li_postgres_django_user:21OBdv7AlVx6KkcXQc5Sn0eroWodL1mj@dpg-cvn2hp24d50c73fsf2s0-a.oregon-postgres.render.com/li_postgres_django
 

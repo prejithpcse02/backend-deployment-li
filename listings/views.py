@@ -394,3 +394,36 @@ class ListingLikeCount(generics.RetrieveAPIView):
         listing = get_object_or_404(Listing, slug=slug, product_id=product_id)
         like_count = listing.likes.count()
         return Response({"like_count": like_count}, status=status.HTTP_200_OK)
+
+class UpdateListingStatus(generics.UpdateAPIView):
+    """API endpoint for updating listing status"""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    queryset = Listing.objects.all()
+    lookup_field = 'product_id'
+
+    def update(self, request, *args, **kwargs):
+        listing = self.get_object()
+        
+        # Check if user is the owner of the listing
+        if request.user.id != listing.seller.id:
+            raise PermissionDenied("You don't have permission to update this listing's status")
+
+        # Validate the status
+        new_status = request.data.get('status')
+        valid_statuses = ['available', 'pending', 'sold']
+        
+        if not new_status or new_status not in valid_statuses:
+            return Response(
+                {'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update the status
+        listing.status = new_status
+        listing.save()
+
+        return Response({
+            'status': listing.status,
+            'message': f'Listing status updated to {new_status}'
+        }, status=status.HTTP_200_OK)
