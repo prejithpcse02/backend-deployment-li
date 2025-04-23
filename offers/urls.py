@@ -1,7 +1,12 @@
-from django.urls import path
-from .views import OfferListCreate, OfferDetail
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import OfferViewSet
+
+router = DefaultRouter()
+router.register(r'', OfferViewSet, basename='offer')
 
 urlpatterns = [
-    path('', OfferListCreate.as_view(), name='offer-list'),
-    path('<int:pk>/', OfferDetail.as_view(), name='offer-detail'),
+    path('', include(router.urls)),
+    path('<int:pk>/accept/', OfferViewSet.as_view({'post': 'accept'}), name='offer-accept'),
+    path('<int:pk>/reject/', OfferViewSet.as_view({'post': 'reject'}), name='offer-reject'),
 ]
