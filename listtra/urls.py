@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/reviews/', include('reviews.urls')),
     path('api/offers/', include('offers.urls')),
     path('api/chat/', include('chat.urls')),
+    path('api/notifications_new/', include('notifications_new.urls')),  # Add new notifications URLs
     
     # JWT Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

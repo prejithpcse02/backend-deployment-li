@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'offers',
     'reviews',
     'chat',
+    'notifications_new',
 
     # Third-party apps
     'rest_framework',
@@ -217,4 +218,15 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+}
+
+# Firebase Configuration
+FIREBASE_SERVICE_ACCOUNT = config('FIREBASE_SERVICE_ACCOUNT', default='')
+
+# Notification Settings
+NOTIFICATION_SETTINGS = {
+    'DEFAULT_PRIORITY': 'high',
+    'DEFAULT_SOUND': 'default',
+    'ANDROID_CHANNEL_ID': 'default',
+    'APNS_CATEGORY': 'default',
 }
