@@ -9,6 +9,9 @@ from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from listings.models import Listing
 from rest_framework.exceptions import PermissionDenied, NotFound
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
@@ -81,6 +84,18 @@ class MessageViewSet(viewsets.ModelViewSet):
             Q(conversation__participants=self.request.user) &
             Q(is_deleted=False)
         ).order_by('created_at')
+
+    def create(self, request, *args, **kwargs):
+        logger.info(f"Received message creation request with data: {request.data}")
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            logger.error(f"Error creating message: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         conversation = serializer.validated_data['conversation']

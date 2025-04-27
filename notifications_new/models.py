@@ -28,7 +28,7 @@ class Notification(models.Model):
     
     # Generic foreign key for linking to any model
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True, related_name='new_notification_set')
-    object_id = models.CharField(max_length=50, null=True, blank=True)
+    object_id = models.CharField(max_length=255, null=True, blank=True)
     content_object = GenericForeignKey('content_type', 'object_id')
 
     class Meta:

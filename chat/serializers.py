@@ -4,10 +4,12 @@ from users.serializers import UserSerializer
 from listings.serializers import ListingSerializer
 from offers.serializers import OfferSerializer
 from offers.models import Offer
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
-    sender_id = serializers.IntegerField(write_only=True)
     conversation = serializers.PrimaryKeyRelatedField(queryset=Conversation.objects.all())
     offer_id = serializers.IntegerField(required=False, allow_null=True)
     offer = OfferSerializer(read_only=True)
@@ -16,12 +18,13 @@ class MessageSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'sender', 'sender_id', 'content', 'message_type', 'file_url', 
+        fields = ['id', 'conversation', 'sender', 'content', 'message_type', 'file_url', 
                  'is_read', 'created_at', 'updated_at', 'is_deleted', 'is_offer', 'offer_id', 'offer', 
                  'price', 'listing_title']
         read_only_fields = ['sender', 'created_at', 'updated_at', 'offer', 'listing_title']
 
     def validate(self, data):
+        logger.info(f"Validating message data: {data}")
         request = self.context.get('request')
         if request and request.user:
             conversation = data.get('conversation')
@@ -54,12 +57,17 @@ class MessageSerializer(serializers.ModelSerializer):
                         listing=conversation.listing,
                         offered_by=request.user,
                         status='Pending'
-                    ).exists()
+                    ).first()
+                    
                     if existing_offer:
-                        raise serializers.ValidationError("You already have a pending offer on this listing")
+                        # If there's an existing offer, use it instead of creating a new one
+                        data['offer_id'] = existing_offer.id
+                        data.pop('price', None)  # Remove price since we're using existing offer
+                        logger.info(f"Using existing offer: {existing_offer.id}")
         return data
 
     def create(self, validated_data):
+        logger.info(f"Creating message with validated data: {validated_data}")
         request = self.context.get('request')
         price = validated_data.pop('price', None)
         offer_id = validated_data.pop('offer_id', None)

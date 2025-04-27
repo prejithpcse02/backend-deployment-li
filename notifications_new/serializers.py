@@ -20,6 +20,8 @@ class UserMinimalSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     sender = UserMinimalSerializer(read_only=True, allow_null=True)
     message = serializers.CharField(source='text')
+    product_id = serializers.SerializerMethodField()
+    slug = serializers.SerializerMethodField()
     
     class Meta:
         model = Notification
@@ -32,6 +34,28 @@ class NotificationSerializer(serializers.ModelSerializer):
             'is_read',
             'created_at',
             'content_type',
-            'object_id'
+            'object_id',
+            'product_id',
+            'slug'
         ]
-        read_only_fields = ['recipient', 'sender', 'notification_type', 'message', 'created_at', 'content_type', 'object_id'] 
+        read_only_fields = ['recipient', 'sender', 'notification_type', 'message', 'created_at', 'content_type', 'object_id', 'product_id', 'slug']
+
+    def get_product_id(self, obj):
+        try:
+            # Split the object_id to get slug and product_id
+            parts = obj.object_id.split(':')
+            if len(parts) == 2:
+                return parts[1]  # product_id is the second part
+        except Exception:
+            pass
+        return None
+
+    def get_slug(self, obj):
+        try:
+            # Split the object_id to get slug and product_id
+            parts = obj.object_id.split(':')
+            if len(parts) == 2:
+                return parts[0]  # slug is the first part
+        except Exception:
+            pass
+        return None 

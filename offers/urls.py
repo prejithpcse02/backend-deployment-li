@@ -9,4 +9,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('<int:pk>/accept/', OfferViewSet.as_view({'post': 'accept'}), name='offer-accept'),
     path('<int:pk>/reject/', OfferViewSet.as_view({'post': 'reject'}), name='offer-reject'),
+    path('check-pending/', OfferViewSet.as_view({'get': 'check_pending'}), name='offer-check-pending'),
 ]
