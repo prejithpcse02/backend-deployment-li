@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from listings.models import Listing
+from offers.models import Offer
 from .models import Notification
 from .utils import send_push_notification
 
@@ -14,11 +15,18 @@ class NotificationService:
         
         # Get the object ID based on the model type
         if isinstance(content_object, Listing):
-            # For Listing model, use the product_id field
-            object_id = content_object.product_id
+            # For Listing model, use the product_id and slug
+            object_id = f"{content_object.slug}:{content_object.product_id}"
+        elif isinstance(content_object, Offer):
+            # For Offer model, use the listing's slug and product_id
+            object_id = f"{content_object.listing.slug}:{content_object.listing.product_id}"
+        elif hasattr(content_object, 'conversation') and hasattr(content_object.conversation, 'listing'):
+            # For messages and offers, use the listing's slug and product_id
+            listing = content_object.conversation.listing
+            object_id = f"{listing.slug}:{listing.product_id}"
         else:
             # For other models, use the id field
-            object_id = content_object.id
+            object_id = str(content_object.id)
         
         # Create the notification
         notification = Notification.objects.create(
@@ -41,20 +49,14 @@ class NotificationService:
         if recipient:
             # Get sender's details
             sender = chat_message.sender
-            sender_details = {
-                'id': sender.id,
-                'username': sender.username,
-                'nickname': sender.nickname,
-                'email': sender.email,
-                'profile_picture': sender.profile_picture.url if hasattr(sender, 'profile_picture') and sender.profile_picture else None
-            }
+            listing = chat_message.conversation.listing
             
             NotificationService.create_notification(
                 recipient=recipient,
                 notification_type='message',
-                text=f'You have a new message from {sender.nickname}',
+                message=f'You have a new message from {sender.nickname}',
                 sender=sender,
-                content_object=chat_message
+                content_object=listing  # Pass the listing instead of the message
             )
 
     @staticmethod
@@ -62,15 +64,21 @@ class NotificationService:
         """
         Create notification for new listing (for followers)
         """
-        followers = listing.seller.followers.all()
-        for follower in followers:
-            NotificationService.create_notification(
-                recipient=follower,
-                notification_type='new_listing',
-                text=f'{listing.seller.nickname} has listed a new item: {listing.title}',
-                sender=listing.seller,
-                content_object=listing
-            )
+        try:
+            # Check if the seller has followers
+            if hasattr(listing.seller, 'followers'):
+                followers = listing.seller.followers.all()
+                for follower in followers:
+                    NotificationService.create_notification(
+                        recipient=follower,
+                        notification_type='new_listing',
+                        message=f'{listing.seller.nickname} has listed a new item: {listing.title}',
+                        sender=listing.seller,
+                        content_object=listing
+                    )
+        except Exception as e:
+            # Log the error but don't break the listing creation
+            print(f"Error creating listing notifications: {str(e)}")
 
     @staticmethod
     def create_listing_liked_notification(listing, liker):
@@ -94,7 +102,7 @@ class NotificationService:
         NotificationService.create_notification(
             recipient=listing.seller,
             notification_type='item_sold',
-            text=f'Your listing {listing.title} has been sold to {buyer.nickname}',
+            message=f'Your listing {listing.title} has been sold to {buyer.nickname}',
             sender=buyer,
             content_object=listing
         )
@@ -107,9 +115,9 @@ class NotificationService:
         NotificationService.create_notification(
             recipient=offer.listing.seller,
             notification_type='offer',
-            text=f'{offer.user.nickname} made an offer of ₹{offer.amount} on your listing: {offer.listing.title}',
-            sender=offer.user,
-            content_object=offer
+            content_object=offer,  # Pass the offer directly
+            message=f'{offer.offered_by.nickname} made an offer of ₹{offer.price} on your listing: {offer.listing.title}',
+            sender=offer.offered_by
         )
 
     @staticmethod
@@ -118,11 +126,11 @@ class NotificationService:
         Create notification when an offer is accepted
         """
         NotificationService.create_notification(
-            recipient=offer.user,
+            recipient=offer.offered_by,
             notification_type='offer',
-            text=f'Your offer of ₹{offer.amount} for {offer.listing.title} has been accepted!',
-            sender=offer.listing.seller,
-            content_object=offer
+            content_object=offer,  # Pass the offer directly
+            message=f'Your offer of ₹{offer.price} for {offer.listing.title} has been accepted!',
+            sender=offer.listing.seller
         )
 
     @staticmethod
@@ -131,11 +139,11 @@ class NotificationService:
         Create notification when an offer is rejected
         """
         NotificationService.create_notification(
-            recipient=offer.user,
+            recipient=offer.offered_by,
             notification_type='offer',
-            text=f'Your offer of ₹{offer.amount} for {offer.listing.title} has been rejected',
-            sender=offer.listing.seller,
-            content_object=offer
+            content_object=offer,  # Pass the offer directly
+            message=f'Your offer of ₹{offer.price} for {offer.listing.title} has been rejected',
+            sender=offer.listing.seller
         )
 
     @staticmethod
@@ -146,9 +154,9 @@ class NotificationService:
         NotificationService.create_notification(
             recipient=review.reviewed_user,
             notification_type='review',
-            text=f'{review.reviewer.nickname} left you a {review.rating}-star review',
-            sender=review.reviewer,
-            content_object=review
+            content_object=review.reviewed_product,  # reviewed_product is already a Listing object
+            message=f'{review.reviewer.nickname} left you a {review.rating}-star review',
+            sender=review.reviewer
         )
 
     @staticmethod

@@ -7,7 +7,7 @@ from offers.models import Offer
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
-    sender_id = serializers.IntegerField(write_only=True)
+    sender_id = serializers.IntegerField(write_only=True, required=False)
     conversation = serializers.PrimaryKeyRelatedField(queryset=Conversation.objects.all())
     offer_id = serializers.IntegerField(required=False, allow_null=True)
     offer = OfferSerializer(read_only=True)
